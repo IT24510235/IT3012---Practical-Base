@@ -1,6 +1,7 @@
 import random
 import tkinter as tk
-from agent import SimpleReflexAgent, ModelBasedAgent
+from agent import SearchAgent
+
 
 class VisualGridHuntGame:
     """A flexible Pacman-style grid environment with support for configurable opponents and larger scales."""
@@ -8,13 +9,15 @@ class VisualGridHuntGame:
     def __init__(self, width=10, height=10, num_food=10, num_opponents=2, custom_walls=None):
         self.width = width
         self.height = height
-        self.agent_pos = [0, 0]  
+        self.agent_pos = [0, 0]  # Starting position (x, y)
 
         if custom_walls is not None:
             self.walls = set(custom_walls)
         else:
+            # Generate default scattered walls
             self.walls = {(2, 2), (2, 3), (5, 5), (6, 5), (3, 7)}
 
+        # Dynamically generate random food positions avoiding walls and agent start
         self.food_positions = set()
         while len(self.food_positions) < num_food:
             fx = random.randint(0, self.width - 1)
@@ -23,6 +26,7 @@ class VisualGridHuntGame:
             if pos_tuple != (0, 0) and pos_tuple not in self.walls:
                 self.food_positions.add(pos_tuple)
 
+        # Generate adversarial opponents
         self.opponents = []
         while len(self.opponents) < num_opponents:
             ox = random.randint(0, self.width - 1)
@@ -36,7 +40,7 @@ class VisualGridHuntGame:
         self.collision = False
 
     def get_percept(self) -> dict:
-        """Step 1.1: Returns partially observable local booleans instead of global coordinates[cite: 3]."""
+        """Step 1.1: Exposing global world model parameters alongside local perceptions."""
         x, y = self.agent_pos
 
         adjacent_coords = {
@@ -62,12 +66,16 @@ class VisualGridHuntGame:
         }
 
         return {
+            'agent_pos': tuple(self.agent_pos),
             'wall_ahead': wall_ahead,
             'food_here': food_nearby['here'],
             'food_nearby': food_nearby,
             'collision': self.collision,
             'score': self.score,
-            'remaining_food': len(self.food_positions)
+            'remaining_food': len(self.food_positions),
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions)
         }
 
     def execute_action(self, action: str):
@@ -109,10 +117,12 @@ class VisualGridHuntGame:
                 self.collision = True
 
     def is_done(self) -> bool:
-        return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
+        return len(self.food_positions) == 0 or self.steps >= 120 or self.collision
 
 
 class GridGameGUI:
+    """Tkinter wrapper that dynamically scales cell sizes."""
+
     def __init__(self, root, width=10, height=10, num_food=12, num_opponents=2, walls=None):
         self.root = root
         self.root.title("IT3012 - Scalable Multi-Agent Grid Hunt")
@@ -178,10 +188,9 @@ class GridGameGUI:
 
     def run_loop(self):
         self.btn.config(state="disabled")
-        
-        # Swap between agents here to test the difference!
-        # agent = SimpleReflexAgent() 
-        agent = ModelBasedAgent()
+
+        # Select algorithm here: 'BFS', 'DFS', or 'UCS'
+        agent = SearchAgent(active_algo='BFS')
 
         def step():
             if not self.env.is_done():
